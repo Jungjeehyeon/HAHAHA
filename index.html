@@ -204,6 +204,494 @@
 
   loadUnread();
   filterCards();
+
+ <!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>댓글</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d0f14;
+      --surface:   #161a22;
+      --border:    #252b38;
+      --accent:    #4f8ef7;
+      --accent-dim:#1e3a6e;
+      --text:      #e8eaf0;
+      --muted:     #6b7280;
+      --danger:    #ef4444;
+      --radius:    12px;
+      --serif:     'Noto Serif KR', Georgia, serif;
+      --sans:      'Noto Sans KR', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.6;
+      min-height: 100vh;
+      padding: 60px 20px 100px;
+    }
+
+    /* ── Section wrapper ── */
+    .comments-section {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    .comments-header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 36px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .comments-header h2 {
+      font-family: var(--serif);
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+    .comment-count {
+      font-size: 13px;
+      color: var(--accent);
+      background: var(--accent-dim);
+      padding: 2px 9px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+
+    /* ── Form ── */
+    .comment-form {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 40px;
+      transition: border-color 0.2s;
+    }
+    .comment-form:focus-within {
+      border-color: var(--accent);
+    }
+
+    .form-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+    label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    input[type="text"],
+    textarea {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      resize: none;
+    }
+    input[type="text"]:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(79,142,247,0.12);
+    }
+    input[type="text"]::placeholder,
+    textarea::placeholder { color: #3d4554; }
+    textarea { min-height: 96px; line-height: 1.6; }
+
+    .form-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 14px;
+    }
+    .char-count {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* ── Submit button ── */
+    .btn-submit {
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      font-family: var(--sans);
+      font-size: 14px;
+      font-weight: 500;
+      padding: 9px 22px;
+      transition: background 0.15s, transform 0.1s, opacity 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .btn-submit:hover:not(:disabled) { background: #3a7ce8; }
+    .btn-submit:active:not(:disabled) { transform: scale(0.97); }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-submit .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      display: none;
+    }
+    .btn-submit.loading .spinner { display: block; }
+    .btn-submit.loading .btn-label { display: none; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1e2a3a;
+      border: 1px solid var(--accent);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 14px;
+      padding: 12px 22px;
+      opacity: 0;
+      transition: transform 0.3s cubic-bezier(.34,1.56,.64,1), opacity 0.25s;
+      z-index: 1000;
+      white-space: nowrap;
+    }
+    .toast.error { border-color: var(--danger); }
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    /* ── Comment list ── */
+    .comments-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    /* ── Skeleton loader ── */
+    .skeleton-item {
+      padding: 22px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .skeleton-line {
+      height: 12px;
+      border-radius: 6px;
+      background: linear-gradient(90deg, var(--surface) 25%, #1e2432 50%, var(--surface) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      margin-bottom: 10px;
+    }
+    .skeleton-line.short { width: 30%; }
+    .skeleton-line.medium { width: 60%; }
+    .skeleton-line.long { width: 90%; }
+
+    /* ── Comment card ── */
+    .comment-item {
+      padding: 22px 0;
+      border-bottom: 1px solid var(--border);
+      animation: fadeUp 0.35s ease both;
+    }
+    .comment-item:last-child { border-bottom: none; }
+
+    .comment-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .nickname {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+    }
+    .time {
+      font-size: 12px;
+      color: var(--muted);
+      margin-left: auto;
+    }
+    .comment-content {
+      font-size: 14.5px;
+      color: #c8ccd6;
+      line-height: 1.7;
+      padding-left: 42px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* ── Empty state ── */
+    .empty-state {
+      text-align: center;
+      padding: 60px 0;
+      color: var(--muted);
+    }
+    .empty-icon {
+      font-size: 36px;
+      margin-bottom: 14px;
+      opacity: 0.4;
+    }
+    .empty-state p { font-size: 14px; }
+
+    /* ── Error state ── */
+    .error-state {
+      text-align: center;
+      padding: 40px 0;
+      color: var(--danger);
+      font-size: 14px;
+    }
+
+    /* ── Animations ── */
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 480px) {
+      .form-row { flex-direction: column; }
+      .form-footer { flex-direction: column; align-items: flex-end; gap: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<section class="comments-section" id="comments">
+
+  <!-- Header -->
+  <div class="comments-header">
+    <h2>댓글</h2>
+    <span class="comment-count" id="countBadge">…</span>
+  </div>
+
+  <!-- Form -->
+  <div class="comment-form">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="nickname">닉네임</label>
+        <input type="text" id="nickname" placeholder="익명의 독자" maxlength="20" autocomplete="off" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="content">댓글</label>
+      <textarea id="content" placeholder="생각을 남겨주세요…" maxlength="500"></textarea>
+    </div>
+    <div class="form-footer">
+      <span class="char-count"><span id="charCount">0</span> / 500</span>
+      <button class="btn-submit" id="submitBtn">
+        <div class="spinner"></div>
+        <span class="btn-label">등록하기</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- List -->
+  <div class="comments-list" id="commentsList"></div>
+</section>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  const SUPABASE_URL  = 'https://lzviemcdjgqhnqetdgim.supabase.co';
+  const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6dmllbWNkamdxaG5xZXRkZ2ltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzMTYzNzcsImV4cCI6MjA5MTg5MjM3N30.4KWifG_lD91KrrW8hOkSEOzt8yfUgrENgh4dYQTcFtI';
+  const TABLE         = 'comments';
+
+  const headers = {
+    'Content-Type':  'application/json',
+    'apikey':        SUPABASE_ANON,
+    'Authorization': `Bearer ${SUPABASE_ANON}`,
+    'Prefer':        'return=representation',
+  };
+
+  /* ── Helpers ── */
+  const $  = id => document.getElementById(id);
+  const el = (tag, cls, html) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html !== undefined) e.innerHTML = html;
+    return e;
+  };
+
+  const AVATAR_COLORS = [
+    ['#1a3a5c','#4f8ef7'], ['#1a3a2a','#4faa6e'], ['#3a1a2a','#c96b8e'],
+    ['#2a2a1a','#c9a64f'], ['#1a2a3a','#4fc9c9'], ['#2a1a3a','#8e6bc9'],
+  ];
+  function avatarColors(name) {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
+    return AVATAR_COLORS[h % AVATAR_COLORS.length];
+  }
+
+  function timeAgo(iso) {
+    const diff = (Date.now() - new Date(iso)) / 1000;
+    if (diff < 60)   return '방금 전';
+    if (diff < 3600) return `${Math.floor(diff/60)}분 전`;
+    if (diff < 86400)return `${Math.floor(diff/3600)}시간 전`;
+    return new Date(iso).toLocaleDateString('ko-KR', { month:'short', day:'numeric' });
+  }
+
+  let toastTimer;
+  function showToast(msg, isError = false) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast' + (isError ? ' error' : '');
+    void t.offsetWidth;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+  }
+
+  /* ── Fetch comments ── */
+  async function loadComments() {
+    const list = $('commentsList');
+    list.innerHTML = [1,2,3].map(() => `
+      <div class="skeleton-item">
+        <div class="skeleton-line short"></div>
+        <div class="skeleton-line medium"></div>
+        <div class="skeleton-line long"></div>
+      </div>`).join('');
+
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/${TABLE}?select=*&order=created_at.desc`,
+        { headers }
+      );
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+
+      $('countBadge').textContent = data.length;
+      list.innerHTML = '';
+
+      if (data.length === 0) {
+        list.appendChild(renderEmpty());
+        return;
+      }
+      data.forEach((c, i) => {
+        const item = renderComment(c);
+        item.style.animationDelay = `${i * 40}ms`;
+        list.appendChild(item);
+      });
+    } catch (e) {
+      list.innerHTML = '';
+      const err = el('div','error-state');
+      err.textContent = '댓글을 불러오는 데 실패했습니다.';
+      list.appendChild(err);
+    }
+  }
+
+  function renderEmpty() {
+    const d = el('div','empty-state');
+    d.innerHTML = '<div class="empty-icon">✦</div><p>첫 번째 댓글을 남겨보세요</p>';
+    return d;
+  }
+
+  function renderComment(c) {
+    const nick = c.nickname || '익명';
+    const [bg, fg] = avatarColors(nick);
+    const item = el('div','comment-item');
+    item.innerHTML = `
+      <div class="comment-meta">
+        <div class="avatar" style="background:${bg};color:${fg}">${nick[0].toUpperCase()}</div>
+        <span class="nickname">${escHtml(nick)}</span>
+        <span class="time">${timeAgo(c.created_at)}</span>
+      </div>
+      <div class="comment-content">${escHtml(c.content)}</div>`;
+    return item;
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  /* ── Submit ── */
+  async function submitComment() {
+    const nick    = $('nickname').value.trim() || '익명';
+    const content = $('content').value.trim();
+    if (!content) { showToast('댓글 내용을 입력해주세요', true); return; }
+
+    const btn = $('submitBtn');
+    btn.disabled = true;
+    btn.classList.add('loading');
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ nickname: nick, content }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+
+      $('content').value = '';
+      $('charCount').textContent = '0';
+      showToast('댓글이 등록되었습니다 ✓');
+      await loadComments();
+    } catch (e) {
+      showToast('등록에 실패했습니다. 잠시 후 다시 시도해주세요.', true);
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+    }
+  }
+
+  /* ── Events ── */
+  $('submitBtn').addEventListener('click', submitComment);
+
+  $('content').addEventListener('input', function() {
+    $('charCount').textContent = this.value.length;
+  });
+
+  $('content').addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submitComment();
+  });
+
+  /* ── Init ── */
+  loadComments();
+</script>
+</body>
+</html>
 </script>
 </body>
 </html>
